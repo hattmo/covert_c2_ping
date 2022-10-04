@@ -1,0 +1,11 @@
+/target
+/dst
+/README.md
+/Dockerfile
+/.*
+/setup.cfg
+/out
+/makefile
+/package
+/package.tar.gz
+/covert_c2_ping_server

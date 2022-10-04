@@ -1,0 +1,26 @@
+cargo-features = ["per-package-target"]
+
+[package]
+authors = ["Matthew \"Oscar\" Howard"]
+default-target = "x86_64-unknown-linux-gnu"
+description = "Server for recieving ping covert channels for cobalt strike"
+edition = "2021"
+name = "covert_c2_ping_server"
+version = "0.1.1"
+
+[dependencies]
+covert_c2_ping_common = {path = "../covert_c2_ping_common"}
+anyhow = "1"
+clap = {version = "4", features = ["derive"]}
+covert_common = "0.1"
+covert_server = "0.1"
+lazy_static = "1"
+nfq = "0.2"
+pnet_datalink = "0.31"
+pnet_packet = "0.31"
+tokio = {features = ["full"], version = "1"}
+tracing = "0.1"
+tracing-subscriber = "0.3"
+warp = "0.3"
+serde = { features = ["serde_derive"], version = "1" }
+rand = "0.8.5"
