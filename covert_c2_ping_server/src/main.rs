@@ -1,15 +1,14 @@
 #![feature(slice_range)]
 #![feature(never_type)]
 mod nft;
-mod web;
-mod worker;
+mod patcher;
+mod workers;
 use anyhow::{bail, Result};
-
-use crate::nft::NftRules;
 use clap::Parser;
 use covert_c2_ping_common::PingMessage;
 use covert_common::CovertChannel;
 use lazy_static::lazy_static;
+use nft::NftRules;
 use std::{collections::HashMap, time::Duration};
 use tokio::{
     select,
@@ -21,7 +20,10 @@ use tokio::{
     task,
 };
 use tracing::{Instrument, Level};
-use worker::PingTransaction;
+use workers::{
+    ping::{self, PingTransaction},
+    web,
+};
 
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
@@ -55,14 +57,14 @@ lazy_static! {
         Mutex::new(HashMap::<u16, UnboundedSender<()>>::new());
 }
 
-fn main() {
+fn main() -> Result<()> {
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
-        .build()
-        .unwrap();
-    rt.block_on(entry()).unwrap();
+        .build()?;
+    rt.block_on(entry())?;
     rt.shutdown_timeout(Duration::from_secs(1));
-    tracing::info!("Shutdown complete")
+    tracing::info!("Shutdown complete");
+    Ok(())
 }
 
 async fn entry() -> Result<()> {
@@ -92,7 +94,7 @@ async fn entry() -> Result<()> {
         .instrument(tracing::span!(Level::INFO, "signal_handle")),
     );
 
-    let (downstream_sender, upstream_receiver, recv_h, send_h) = worker::start_workers()?;
+    let (downstream_sender, upstream_receiver, recv_h, send_h) = ping::start_ping_workers()?;
 
     let main_h = task::spawn(main_loop(downstream_sender, upstream_receiver));
 

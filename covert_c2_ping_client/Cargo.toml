@@ -7,11 +7,14 @@ name = "covert_c2_ping_client"
 version = "0.1.1"
 
 [dependencies]
-covert_c2_ping_common = {path = "../covert_c2_ping_common"}
+aes = "0.8"
 anyhow = "1"
+bincode = "1"
+covert_c2_ping_common = {path = "../covert_c2_ping_common"}
 covert_client = "0.1"
 covert_common = "0.1"
 rand = "0.8"
+serde = {version = "1", features = ["derive"]}
 
 [dependencies.windows]
 features = [
@@ -20,4 +23,4 @@ features = [
   "Win32_Foundation",
   "Win32_Networking_WinSock",
 ]
-version = "0.39.0"
+version = "0.42.0"

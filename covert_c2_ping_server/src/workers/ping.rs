@@ -1,6 +1,4 @@
 use anyhow::{anyhow, bail, Result};
-use covert_c2_ping_common::PingMessage;
-use covert_server::{CSFrameRead, CSFrameWrite};
 use nfq::{Queue, Verdict};
 use pnet_datalink::{
     linux::{self, Config as LinuxConfig},
@@ -21,13 +19,11 @@ use pnet_packet::{
 
 use std::{fmt::Display, net::Ipv4Addr};
 use tokio::{
-    net::TcpStream,
-    select,
     sync::mpsc::{self, UnboundedReceiver, UnboundedSender},
     task::{self, JoinHandle},
 };
 
-use crate::{CHANNEL, GLOBAL_CONF, SESSIONS};
+use crate::GLOBAL_CONF;
 
 #[derive(Debug)]
 pub struct PingTransaction {
@@ -50,7 +46,7 @@ impl Display for PingTransaction {
     }
 }
 
-pub fn start_workers() -> Result<(
+pub fn start_ping_workers() -> Result<(
     UnboundedSender<PingTransaction>,
     UnboundedReceiver<PingTransaction>,
     JoinHandle<()>,
@@ -209,10 +205,9 @@ fn ping_send(
         }
         Err(err) => {
             bail!(err);
-        } // sender.send_to(packet, Option::None);
+        }
     }
     Ok(())
-    // tracing::info!("Hello, world!");
 }
 
 fn send_iteration(ping: PingTransaction) -> Result<Vec<u8>, IterationError> {
@@ -252,53 +247,4 @@ fn send_iteration(ping: PingTransaction) -> Result<Vec<u8>, IterationError> {
     eth_p.set_ethertype(EtherTypes::Ipv4);
     eth_p.set_payload(ip_payload);
     Ok(eth_p.packet().to_vec())
-}
-
-pub async fn session_worker(connection: TcpStream, id: u16) {
-    let (sender, mut receiver) = mpsc::unbounded_channel::<()>();
-    SESSIONS.lock().await.insert(id, sender);
-    let (mut read_tcp, mut write_tcp) = connection.into_split();
-    let ts_reader = task::spawn(async move {
-        loop {
-            match read_tcp.read_frame().await {
-                Ok(data) => {
-                    CHANNEL
-                        .lock()
-                        .await
-                        .put_message(PingMessage::DataMessage(data), id);
-                }
-                Err(_) => {
-                    tracing::info!("Session closed with TS");
-                    break;
-                }
-            };
-        }
-    });
-
-    let ts_writer = task::spawn(async move {
-        loop {
-            if let Some(_) = receiver.recv().await {
-                if let Some(mess) = CHANNEL.lock().await.get_message(id) {
-                    match mess {
-                        PingMessage::DataMessage(data) => {
-                            if let Err(_) = write_tcp.write_frame(&data).await {
-                                tracing::info!("Session closed with TS");
-                                break;
-                            };
-                        }
-                        PingMessage::SleepMessage(_) => todo!(),
-                        PingMessage::InitMessage(_, _) => todo!(),
-                        PingMessage::CloseMessage => todo!(),
-                    }
-                }
-            } else {
-                tracing::info!("Session closed with downstream");
-                break;
-            }
-        }
-    });
-    select! {
-        _ = ts_reader => {}
-        _ = ts_writer => {}
-    };
 }
