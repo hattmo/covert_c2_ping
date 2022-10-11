@@ -8,4 +8,13 @@ version = "0.1.0"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+gloo = "0.8.0"
+gloo-utils = {version="0.1.5", features =["serde"]}
+log = "0.4.17"
+wasm-bindgen = {version = "0.2.83", features = ["serde-serialize"]}
+wasm-logger = "0.2.0"
+web-sys = "0.3.60"
+# wasm-bindgen = "0.2.83"
+serde = {version = "1.0.145", features = ["serde_derive"]}
+wasm-bindgen-futures = "0.4.33"
 yew = "0.19"
