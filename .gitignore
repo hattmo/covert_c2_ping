@@ -1,9 +1,6 @@
 /.vscode
 /.cargo
 /target
-/dst
-/vendor
 /out
-/package
-/package.tar.gz
 dist
+out.tar.gz

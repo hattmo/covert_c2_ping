@@ -1,8 +1,7 @@
-use gloo_utils::format::JsValueSerdeExt;
 use serde::Serialize;
-use wasm_bindgen::{JsCast, JsValue};
+use wasm_bindgen::{prelude::*, JsCast};
 use wasm_bindgen_futures::spawn_local;
-use web_sys::HtmlInputElement;
+use web_sys::{HtmlAnchorElement, HtmlInputElement};
 use yew::{events::Event, prelude::*, Callback};
 
 #[function_component(Root)]
@@ -58,18 +57,49 @@ fn root() -> Html {
         })
     };
     let generate_payload = {
+        let host = host.clone();
+        let pipe = pipe.clone();
+        let is_64 = is_64.clone();
+        let sleep = sleep.clone();
         Callback::from(move |_| {
-            spawn_local(async {
-                let out = Foo {
-                    bar: "Hi".to_owned(),
-                    foo: 4,
+            let host = host.clone();
+            let pipe = pipe.clone();
+            let is_64 = is_64.clone();
+            let sleep = sleep.clone();
+            spawn_local(async move {
+                let out = NewAgent {
+                    host: host.to_string(),
+                    pipe: pipe.to_string(),
+                    sleep: *sleep,
+                    arch: if *is_64 {
+                        "x64".to_owned()
+                    } else {
+                        "x86".to_owned()
+                    },
                 };
-                let blah = JsValue::from_serde(&out).unwrap();
+
+                log::warn!("Sending");
                 let res = gloo::net::http::Request::post("/api/agents")
-                    .body(blah)
+                    .json(&out)
+                    .unwrap()
                     .send()
                     .await
                     .unwrap();
+                if !res.ok() {
+                    return;
+                }
+                let foo = res.binary().await.unwrap();
+                let file = gloo::file::File::new("Payload.exe", foo.as_slice());
+                let a: HtmlAnchorElement = gloo::utils::document()
+                    .create_element("a")
+                    .unwrap()
+                    .unchecked_into();
+
+                let url = gloo::file::ObjectUrl::from(file);
+                a.set_href(&url);
+                a.set_download("Payload.exe");
+                a.click();
+                log::warn!("Sent")
             })
         })
     };
@@ -96,9 +126,12 @@ fn root() -> Html {
 }
 
 #[derive(Serialize)]
-struct Foo {
-    foo: u8,
-    bar: String,
+#[allow(dead_code)]
+pub struct NewAgent {
+    pipe: String,
+    host: String,
+    arch: String,
+    sleep: u64,
 }
 
 fn main() {

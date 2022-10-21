@@ -25,4 +25,4 @@ warp = "0.3"
 serde = { features = ["serde_derive"], version = "1" }
 rand = "0.8"
 bincode = "1"
-aes = "0.8.1"
+aes = "0.8"

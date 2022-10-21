@@ -3,11 +3,14 @@ use covert_server::{CSFrameRead, CSFrameWrite};
 
 use tokio::{net::TcpStream, select, sync::mpsc, task};
 
-use crate::{CHANNEL, SESSIONS};
+use crate::{SessionData, CHANNEL, SESSIONS};
 
-pub async fn session_worker(connection: TcpStream, id: u16) {
+pub async fn session_worker(connection: TcpStream, id: u16, arch: String) {
     let (sender, mut receiver) = mpsc::unbounded_channel::<()>();
-    SESSIONS.lock().await.insert(id, sender);
+    SESSIONS
+        .lock()
+        .await
+        .insert(id, SessionData::new(sender, &arch));
     let (mut read_tcp, mut write_tcp) = connection.into_split();
 
     let ts_reader = task::spawn(async move {

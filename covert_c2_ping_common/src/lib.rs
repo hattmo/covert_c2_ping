@@ -29,6 +29,6 @@ pub struct ClientConfig<'a> {
 
 pub const KEY_SIZE: usize = 32;
 pub const BLOCK_SIZE: usize = 16;
-pub const NUM_BLOCKS: usize = 200;
+pub const NUM_BLOCKS: usize = 17000;
 pub const STAMP_BYTE: u8 = 0x01u8;
 pub const BUF_SIZE: usize = (NUM_BLOCKS * BLOCK_SIZE) + KEY_SIZE;
