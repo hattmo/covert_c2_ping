@@ -203,7 +203,6 @@ name = "covert_c2_ping_client"
 version = "0.1.1"
 dependencies = [
  "aes",
- "anyhow",
  "bincode",
  "covert_c2_ping_common",
  "covert_client",
@@ -247,6 +246,7 @@ dependencies = [
 name = "covert_c2_ping_web"
 version = "0.1.0"
 dependencies = [
+ "covert_c2_ping_common",
  "gloo 0.8.0",
  "gloo-utils",
  "js-sys",

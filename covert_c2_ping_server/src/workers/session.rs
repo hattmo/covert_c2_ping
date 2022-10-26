@@ -1,16 +1,16 @@
-use covert_c2_ping_common::PingMessage;
+use covert_c2_ping_common::{PingMessage, SessionData};
 use covert_server::{CSFrameRead, CSFrameWrite};
 
 use tokio::{net::TcpStream, select, sync::mpsc, task};
 
-use crate::{SessionData, CHANNEL, SESSIONS};
+use crate::{CHANNEL, SESSIONS};
 
 pub async fn session_worker(connection: TcpStream, id: u16, arch: String) {
     let (sender, mut receiver) = mpsc::unbounded_channel::<()>();
     SESSIONS
         .lock()
         .await
-        .insert(id, SessionData::new(sender, &arch));
+        .insert(id, (sender, SessionData::new(&arch)));
     let (mut read_tcp, mut write_tcp) = connection.into_split();
 
     let ts_reader = task::spawn(async move {
@@ -60,4 +60,5 @@ pub async fn session_worker(connection: TcpStream, id: u16, arch: String) {
         _ = ts_reader => {}
         _ = ts_writer => {}
     };
+    SESSIONS.lock().await.remove(&id);
 }

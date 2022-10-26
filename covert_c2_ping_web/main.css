@@ -1,0 +1,29 @@
+.new_agent_form {
+    place-content: center;
+    display: grid;
+    width: max-content;
+    grid-template-columns: max-content 1fr;
+    gap: 4px;
+    padding: 4px;
+
+}
+
+.new_agent_submit {
+    grid-column: span 2;
+    place-self: center;
+    width: 80%;
+}
+
+
+.agent_list {
+    display: grid;
+    grid-template-columns: max-content max-content max-content max-content;
+    width: fit-content;
+    background-color: black;
+    gap: 2px;
+    padding: 2px;
+}
+.agent_list * {
+    padding: 2px;
+    background-color: gray;
+}
