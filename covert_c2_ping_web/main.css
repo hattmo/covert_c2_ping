@@ -17,7 +17,7 @@
 
 .agent_list {
     display: grid;
-    grid-template-columns: max-content max-content max-content max-content;
+    grid-template-columns: max-content max-content max-content max-content max-content;
     width: fit-content;
     background-color: black;
     gap: 2px;

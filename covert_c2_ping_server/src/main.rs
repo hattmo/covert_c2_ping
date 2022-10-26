@@ -65,6 +65,7 @@ fn main() -> Result<()> {
 async fn entry() -> Result<()> {
     let conf = &(*GLOBAL_CONF);
     tracing_subscriber::fmt::init();
+    tracing::info!("Control Panel on port 8080");
     tracing::info!(
         "Static Web Files: {:?}",
         environment::get_static_path().as_os_str()

@@ -1,4 +1,4 @@
-use covert_c2_ping_common::AgentSessions;
+use covert_c2_ping_common::{AgentSessions, SessionData};
 use js_sys::Date;
 use std::collections::HashMap;
 use wasm_bindgen_futures::spawn_local;
@@ -6,7 +6,13 @@ use yew::{function_component, html, use_state, Html, UseStateHandle};
 
 #[function_component(AgentList)]
 pub fn agent_list() -> Html {
-    let sessions: UseStateHandle<AgentSessions> = use_state(HashMap::new);
+    let sessions: UseStateHandle<AgentSessions> = use_state(|| {
+        let mut initial = HashMap::new();
+        if cfg!(debug_assertions) {
+            initial.insert(1, SessionData::new("x86"));
+        }
+        initial
+    });
 
     let mut temp: Vec<_> = sessions.iter().collect();
     temp.sort_by_key(|(id, _)| **id);
@@ -30,6 +36,7 @@ pub fn agent_list() -> Html {
                     <div>{data.arch.clone()}</div>
                     <div>{data.host.clone().map(|v|v.to_string()).unwrap_or("Unknown".to_owned())}</div>
                     <div>{last_checkin}</div>
+                    <div><span>{"🗑️"}</span><span>{"🛠️"}</span></div>
                   </>)
         })
         .collect();
@@ -52,6 +59,7 @@ pub fn agent_list() -> Html {
             <div>{"Arch"}</div>
             <div>{"Host"}</div>
             <div>{"Last Check-In"}</div>
+            <div/>
             {fragments}
           </div>)
 }
