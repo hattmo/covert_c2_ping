@@ -8,7 +8,10 @@ use yew::{function_component, html, use_state, Html, UseStateHandle};
 pub fn agent_list() -> Html {
     let sessions: UseStateHandle<AgentSessions> = use_state(HashMap::new);
 
-    let fragments: Html = sessions
+    let mut temp: Vec<_> = sessions.iter().collect();
+    temp.sort_by_key(|(id, _)| **id);
+
+    let fragments: Html = temp
         .iter()
         .map(|(id, data)| {
             let last_checkin = data
@@ -22,7 +25,7 @@ pub fn agent_list() -> Html {
                 })
                 .and_then(|t| Some(format!("{} sec ago", t)))
                 .unwrap_or("Never".to_owned());
-            html!(<key={*id}>
+            html!(<key={**id}>
                     <div>{id}</div>
                     <div>{data.arch.clone()}</div>
                     <div>{data.host.clone().map(|v|v.to_string()).unwrap_or("Unknown".to_owned())}</div>

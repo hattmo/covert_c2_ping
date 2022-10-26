@@ -24,6 +24,8 @@ deploy: all
 clean:
 	cargo clean
 	rm -rf out
+	rm -rf covert_c2_ping_web/dist
+	rm covert_c2_ping.tar.gz
 
 $(32client): covert_c2_ping_client/src/*
 	cargo build -Z build-std=std,panic_abort -Z build-std-features=panic_immediate_abort --target i686-pc-windows-gnu --release -p covert_c2_ping_client
