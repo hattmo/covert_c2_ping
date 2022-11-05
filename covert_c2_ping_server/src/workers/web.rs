@@ -72,13 +72,14 @@ async fn post_agent(new_agent: NewAgent) -> Result<impl Reply, Rejection> {
 
 async fn delete_agent(config: DeleteAgent) -> Result<impl Reply, Rejection> {
     SESSIONS.lock().await.remove(&config.agentid);
+    CHANNEL.lock().await.put_message(PingMessage::CloseMessage, config.agentid);
     Ok(warp::reply())
 }
 
 async fn patch_agent(config: PatchAgent) -> Result<impl Reply, Rejection> {
     if let Some(sleep) = config.sleep {
         CHANNEL.lock().await.put_message(
-            PingMessage::SleepMessage(Duration::from_secs(sleep.into())),
+            PingMessage::SleepMessage(Duration::from_secs(sleep)),
             config.agentid,
         );
         return Ok(warp::reply());

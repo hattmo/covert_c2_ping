@@ -7,14 +7,15 @@ version = "0.1.0"
 
 [dependencies]
 covert_c2_ping_common = {path = "../covert_c2_ping_common"}
-gloo = "0.8.0"
-gloo-utils = {version = "0.1.5", features = ["serde"]}
-js-sys = "0.3.60"
-log = "0.4.17"
-serde = {version = "1.0.145", features = ["serde_derive"]}
-serde_json = "1.0.86"
-wasm-bindgen = {version = "0.2.83", features = ["serde-serialize"]}
-wasm-bindgen-futures = "0.4.33"
-wasm-logger = "0.2.0"
-web-sys = {version = "0.3.60", features = ["HtmlAnchorElement"]}
+gloo = "0.8"
+gloo-utils = {version = "0.1", features = ["serde"]}
+itertools = "0.10"
+js-sys = "0.3"
+log = "0.4"
+serde = {version = "1", features = ["serde_derive"]}
+serde_json = "1"
+wasm-bindgen = {version = "0.2", features = ["serde-serialize"]}
+wasm-bindgen-futures = "0.4"
+wasm-logger = "0.2"
+web-sys = {version = "0.3", features = ["HtmlAnchorElement"]}
 yew = "0.19"

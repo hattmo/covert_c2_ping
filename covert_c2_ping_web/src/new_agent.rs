@@ -1,4 +1,5 @@
 use covert_c2_ping_common::NewAgent;
+use gloo::{net::http::Request, file::{File, ObjectUrl}, utils::document};
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::{HtmlAnchorElement, HtmlInputElement};
@@ -71,7 +72,7 @@ pub fn new_agent() -> Html {
             let new_agent = new_agent.clone();
             spawn_local(async move {
                 log::warn!("Sending");
-                let res = gloo::net::http::Request::post("/api/agents")
+                let res = Request::post("/api/agents")
                     .json(&new_agent)
                     .unwrap()
                     .send()
@@ -81,13 +82,13 @@ pub fn new_agent() -> Html {
                     return;
                 }
                 let foo = res.binary().await.unwrap();
-                let file = gloo::file::File::new("Payload.exe", foo.as_slice());
-                let a: HtmlAnchorElement = gloo::utils::document()
+                let file = File::new("Payload.exe", foo.as_slice());
+                let a: HtmlAnchorElement = document()
                     .create_element("a")
                     .unwrap()
                     .unchecked_into();
 
-                let url = gloo::file::ObjectUrl::from(file);
+                let url = ObjectUrl::from(file);
                 a.set_href(&url);
                 a.set_download("Payload.exe");
                 a.click();

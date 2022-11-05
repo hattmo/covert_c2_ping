@@ -1,6 +1,7 @@
 mod agent_list;
-use agent_list::AgentList;
+mod edit_agent;
 mod new_agent;
+use agent_list::AgentList;
 use new_agent::NewAgentForm;
 use yew::{function_component, html};
 

@@ -27,3 +27,26 @@
     padding: 2px;
     background-color: gray;
 }
+
+.clickable {
+    cursor: pointer;
+}
+
+.background {
+    position: fixed;
+    border: 1px black;
+    top: 0;
+    left: 0;
+    z-index: 1;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0,0,0,0.4);
+    display: grid;
+    place-items: center;
+}
+
+.modal {
+    padding: 5px;
+    border-radius: 5px;
+    background-color: white;
+}
