@@ -1,5 +1,5 @@
 use crate::edit_agent::EditAgent;
-use covert_c2_ping_common::{AgentSessions, DeleteAgent, SessionData};
+use covert_c2_ping_common::{AgentSessions, DeleteAgent};
 use gloo::{net::http::Request, timers::callback::Interval};
 use itertools::Itertools;
 use js_sys::Date;
@@ -9,18 +9,9 @@ use yew::{function_component, html, use_effect, use_state, Callback, Html, UseSt
 
 #[function_component(AgentList)]
 pub fn agent_list() -> Html {
-    let sessions: UseStateHandle<AgentSessions> = use_state(|| {
-        let mut initial = HashMap::new();
-        if cfg!(debug_assertions) {
-            initial.insert(2, SessionData::new("x86"));
-            initial.insert(9, SessionData::new("x86"));
-            initial.insert(1, SessionData::new("x86"));
-            initial.insert(7, SessionData::new("x86"));
-        }
-        initial
-    });
+    let sessions: UseStateHandle<AgentSessions> = use_state(HashMap::new);
 
-    let edit_visible: UseStateHandle<Option<u16>> = use_state(|| Some(1));
+    let edit_visible: UseStateHandle<Option<u16>> = use_state(|| None);
 
     let fragments: Html = sessions.iter().sorted_by_key(|(id,_)|**id)
         .map(|(id, data)| {
