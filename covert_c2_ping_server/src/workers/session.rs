@@ -5,7 +5,7 @@ use tokio::{net::TcpStream, select, sync::mpsc, task};
 
 use crate::{CHANNEL, SESSIONS};
 
-pub async fn session_worker(connection: TcpStream, id: u16, arch: String) {
+pub async fn worker(connection: TcpStream, id: u16, arch: String) {
     let (sender, mut receiver) = mpsc::unbounded_channel::<()>();
     SESSIONS
         .lock()
@@ -15,38 +15,35 @@ pub async fn session_worker(connection: TcpStream, id: u16, arch: String) {
 
     let ts_reader = task::spawn(async move {
         loop {
-            match read_tcp.read_frame().await {
-                Ok(data) => {
-                    CHANNEL
-                        .lock()
-                        .await
-                        .put_message(PingMessage::DataMessage(data), id);
-                }
-                Err(_) => {
-                    tracing::info!("Session closed with TS");
-                    break;
-                }
+            if let Ok(data) = read_tcp.read_frame().await {
+                CHANNEL
+                    .lock()
+                    .await
+                    .put_message(PingMessage::DataMessage(data), id);
+            } else {
+                tracing::info!("Session closed with TS");
+                break;
             };
         }
     });
 
     let ts_writer = task::spawn(async move {
         loop {
-            if let Some(_) = receiver.recv().await {
+            if receiver.recv().await.is_some() {
                 if let Some(mess) = CHANNEL.lock().await.get_message(id) {
                     match mess {
                         PingMessage::DataMessage(data) => {
-                            if let Err(_) = write_tcp.write_frame(&data).await {
+                            if write_tcp.write_frame(&data).await.is_err() {
                                 tracing::info!("Session closed with TS");
                                 break;
                             };
                         }
-                        PingMessage::SleepMessage(_) => {
-                            //NOOP
-                        }
                         PingMessage::CloseMessage => {
                             tracing::info!("Close message received");
                             break;
+                        }
+                        _ => {
+                            //NOOP
                         }
                     }
                 }

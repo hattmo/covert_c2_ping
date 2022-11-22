@@ -14,6 +14,7 @@ all: $(64client) $(32client) $(server) $(web)/index.html
 	cp $(32client) out/artifact/artifact_32
 	cp $(server) out/covert_c2_ping
 	cp $(web)/* out/static
+	mdbook build
 	tar -cvzf covert_c2_ping.tar.gz out/*
 
 deploy: all

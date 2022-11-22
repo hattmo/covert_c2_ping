@@ -1,3 +1,4 @@
+#![deny(clippy::all, clippy::pedantic)]
 mod agent_list;
 mod edit_agent;
 mod new_agent;

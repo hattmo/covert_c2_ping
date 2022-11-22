@@ -1,5 +1,9 @@
 use covert_c2_ping_common::NewAgent;
-use gloo::{net::http::Request, file::{File, ObjectUrl}, utils::document};
+use gloo::{
+    file::{File, ObjectUrl},
+    net::http::Request,
+    utils::document,
+};
 use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::{HtmlAnchorElement, HtmlInputElement};
@@ -14,8 +18,7 @@ pub fn new_agent() -> Html {
             let val = e
                 .target()
                 .and_then(|v| v.dyn_into::<HtmlInputElement>().ok())
-                .and_then(|ele| Some(ele.value() == "x86_64"))
-                .unwrap_or(true);
+                .map_or(true, |ele| ele.value() == "x86_64");
             is_64.set(val);
         })
     };
@@ -27,8 +30,8 @@ pub fn new_agent() -> Html {
             let val = e
                 .target()
                 .and_then(|v| v.dyn_into::<HtmlInputElement>().ok())
-                .and_then(|ele| Some(ele.value()))
-                .unwrap_or(String::default());
+                .map(|ele| ele.value())
+                .unwrap_or_default();
             host.set(val);
         })
     };
@@ -40,8 +43,8 @@ pub fn new_agent() -> Html {
             let val = e
                 .target()
                 .and_then(|v| v.dyn_into::<HtmlInputElement>().ok())
-                .and_then(|ele| Some(ele.value()))
-                .unwrap_or(String::default());
+                .map(|ele| ele.value())
+                .unwrap_or_default();
             pipe.set(val);
         })
     };
@@ -81,19 +84,16 @@ pub fn new_agent() -> Html {
                 if !res.ok() {
                     return;
                 }
-                let foo = res.binary().await.unwrap();
-                let file = File::new("Payload.exe", foo.as_slice());
-                let a: HtmlAnchorElement = document()
-                    .create_element("a")
-                    .unwrap()
-                    .unchecked_into();
+                let res_payload = res.binary().await.unwrap();
+                let file = File::new("Payload.exe", res_payload.as_slice());
+                let a: HtmlAnchorElement = document().create_element("a").unwrap().unchecked_into();
 
                 let url = ObjectUrl::from(file);
                 a.set_href(&url);
                 a.set_download("Payload.exe");
                 a.click();
-                log::warn!("Sent")
-            })
+                log::warn!("Sent");
+            });
         })
     };
 

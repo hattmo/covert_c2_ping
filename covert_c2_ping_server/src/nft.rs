@@ -1,17 +1,22 @@
 use anyhow::Result;
 use std::{io::ErrorKind, process::Command, thread::sleep, time::Duration};
-pub struct NftRules {}
-impl Drop for NftRules {
+pub struct Rules {}
+impl Drop for Rules {
     #[tracing::instrument(name = "teardown_rules", skip_all)]
     fn drop(&mut self) {
         tracing::info!("Clearing rules");
-        let _ = Command::new("nft")
+        if Command::new("nft")
             .arg("delete table ip covert_table")
-            .status();
-        tracing::info!("Rules cleared");
+            .status()
+            .is_err()
+        {
+            tracing::info!("Failed to clear rules");
+        } else {
+            tracing::info!("Rules cleared");
+        };
     }
 }
-impl NftRules {
+impl Rules {
     #[tracing::instrument(name = "setup_rules")]
     pub fn new() -> Result<Self> {
         tracing::info!("Setting up rules");
@@ -44,6 +49,6 @@ impl NftRules {
         })?;
         sleep(Duration::from_secs(1));
         tracing::info!("Rules setup");
-        Ok(NftRules {})
+        Ok(Rules {})
     }
 }

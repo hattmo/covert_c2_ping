@@ -1,0 +1,13 @@
+[book]
+authors = ["Matthew 'Oscar' Howard"]
+description = "Manual for Covert C2 Ping"
+language = "en"
+multilingual = false
+src = "book"
+title = "Covert C2 Ping"
+
+[output.html.playground]
+runnable = false
+
+[build]
+build-dir = "out/doc"

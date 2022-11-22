@@ -2,5 +2,6 @@
 /.cargo
 /target
 /out
+/doc
 dist
 covert_c2_ping.tar.gz

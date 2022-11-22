@@ -19,14 +19,16 @@ use pnet_packet::{
 
 use std::{fmt::Display, net::Ipv4Addr};
 use tokio::{
-    sync::mpsc::{self, UnboundedReceiver, UnboundedSender},
-    task::{self, JoinHandle},
+    sync::mpsc::{self},
+    task::{self},
 };
 
 use crate::GLOBAL_CONF;
 
+use super::WorkerHandles;
+
 #[derive(Debug)]
-pub struct PingTransaction {
+pub struct Transaction {
     pub src_mac: [u8; 6],
     pub dst_mac: [u8; 6],
     pub src_ip: Ipv4Addr,
@@ -36,7 +38,7 @@ pub struct PingTransaction {
     pub data: Vec<u8>,
 }
 
-impl Display for PingTransaction {
+impl Display for Transaction {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -46,25 +48,20 @@ impl Display for PingTransaction {
     }
 }
 
-pub fn start_ping_workers() -> Result<(
-    UnboundedSender<PingTransaction>,
-    UnboundedReceiver<PingTransaction>,
-    JoinHandle<()>,
-    JoinHandle<()>,
-)> {
+pub fn start_workers() -> Result<WorkerHandles> {
     let interfaces = linux::interfaces();
     let interface = interfaces
         .iter()
-        .find(|i| i.name == (*GLOBAL_CONF).i)
+        .find(|i| i.name == GLOBAL_CONF.i)
         .expect("Interface not found")
         .clone();
     let mac = interface
         .mac
-        .ok_or(anyhow!("No mac addr on interface."))?
+        .ok_or_else(|| anyhow!("No mac addr on interface."))?
         .octets();
 
-    let (upstream_sender, upstream_receiver) = mpsc::unbounded_channel::<PingTransaction>();
-    let (downstream_sender, downstream_receiver) = mpsc::unbounded_channel::<PingTransaction>();
+    let (upstream_sender, upstream_receiver) = mpsc::unbounded_channel::<Transaction>();
+    let (downstream_sender, downstream_receiver) = mpsc::unbounded_channel::<Transaction>();
 
     let ping_recv_h = task::spawn_blocking(move || {
         if let Err(err) = ping_recv(upstream_sender, interface.index, mac) {
@@ -76,17 +73,17 @@ pub fn start_ping_workers() -> Result<(
             tracing::info!(error = ?err, "Send job ended");
         };
     });
-    return Ok((
+    Ok((
         downstream_sender,
         upstream_receiver,
         ping_recv_h,
         ping_send_h,
-    ));
+    ))
 }
 
 #[tracing::instrument(skip_all)]
 fn ping_recv(
-    upstream_sender: mpsc::UnboundedSender<PingTransaction>,
+    upstream_sender: mpsc::UnboundedSender<Transaction>,
     iface_num: u32,
     dst_mac: [u8; 6],
 ) -> Result<()> {
@@ -106,7 +103,7 @@ fn ping_recv(
             }
             Ok(data) => data,
         };
-        if let Err(_) = upstream_sender.send(data) {
+        if upstream_sender.send(data).is_err() {
             tracing::info!("Upstream channel closed stopping recv task");
             break;
         };
@@ -122,7 +119,7 @@ fn recv_iteration(
     q: &mut Queue,
     iface_num: u32,
     dst_mac: [u8; 6],
-) -> Result<PingTransaction, IterationError> {
+) -> Result<Transaction, IterationError> {
     tracing::info!("Waiting for packet");
     let mut msq = q.recv().or(Err(IterationError::Unrecoverable(
         "Net Filter Queue closed".to_owned(),
@@ -133,9 +130,7 @@ fn recv_iteration(
     }
     let addr = msq
         .get_hw_addr()
-        .ok_or(IterationError::Recoverable(
-            "No mac addr on packet".to_owned(),
-        ))?
+        .ok_or_else(|| IterationError::Recoverable("No mac addr on packet".to_owned()))?
         .to_vec();
     if addr.len() != 6 {
         return Err(IterationError::Recoverable(
@@ -147,19 +142,16 @@ fn recv_iteration(
         payload,
         addr
     );
-    let ip_packet = Ipv4Packet::new(&payload).ok_or(IterationError::Recoverable(
-        "Malformed Ip packet".to_owned(),
-    ))?;
-    let icmp_packet = EchoRequestPacket::new(ip_packet.payload()).ok_or(
-        IterationError::Recoverable("Malformed Icmp packet".to_owned()),
-    )?;
+    let ip_packet = Ipv4Packet::new(&payload)
+        .ok_or_else(|| IterationError::Recoverable("Malformed Ip packet".to_owned()))?;
+    let icmp_packet = EchoRequestPacket::new(ip_packet.payload())
+        .ok_or_else(|| IterationError::Recoverable("Malformed Icmp packet".to_owned()))?;
     tracing::info!(payload=?icmp_packet.payload());
     msq.set_verdict(Verdict::Drop);
-    q.verdict(msq).or(Err(IterationError::Unrecoverable(
-        "Net Filter Queue closed".to_owned(),
-    )))?;
+    q.verdict(msq)
+        .map_err(|_| IterationError::Unrecoverable("Net Filter Queue closed".to_owned()))?;
 
-    Ok(PingTransaction {
+    Ok(Transaction {
         src_mac: addr.try_into().expect("Should be the right size"),
         dst_mac,
         src_ip: ip_packet.get_source(),
@@ -172,7 +164,7 @@ fn recv_iteration(
 
 #[tracing::instrument(skip_all)]
 fn ping_send(
-    mut downstream_reciever: mpsc::UnboundedReceiver<PingTransaction>,
+    mut downstream_reciever: mpsc::UnboundedReceiver<Transaction>,
     iface: NetworkInterface,
 ) -> Result<()> {
     match linux::channel(&iface, LinuxConfig::default()) {
@@ -185,7 +177,7 @@ fn ping_send(
                 }
             };
             tracing::info!("Got ping message to send");
-            match send_iteration(ping) {
+            match send_iteration(&ping) {
                 Ok(data) => {
                     tracing::info!("Sending ping");
                     sender.send_to(&data, Option::None);
@@ -210,25 +202,31 @@ fn ping_send(
     Ok(())
 }
 
-fn send_iteration(ping: PingTransaction) -> Result<Vec<u8>, IterationError> {
+fn send_iteration(ping: &Transaction) -> Result<Vec<u8>, IterationError> {
     let icmp_buf = vec![0u8; MutableEchoReplyPacket::minimum_packet_size() + ping.data.len()];
-    let mut icmp_p = MutableEchoReplyPacket::owned(icmp_buf).unwrap();
+    let mut icmp_p = MutableEchoReplyPacket::owned(icmp_buf)
+        .ok_or_else(|| IterationError::Recoverable("Failed to allocate reply".to_owned()))?;
     icmp_p.set_icmp_type(IcmpTypes::EchoReply);
     icmp_p.set_icmp_code(IcmpCodes::NoCode);
     icmp_p.set_identifier(ping.identifier);
     icmp_p.set_sequence_number(ping.sequence_number);
     icmp_p.set_payload(&ping.data);
-    icmp_p.set_checksum(pnet_packet::util::checksum(&icmp_p.packet(), 1));
+    icmp_p.set_checksum(pnet_packet::util::checksum(icmp_p.packet(), 1));
 
     let icmp_payload = icmp_p.packet();
     let packet_size = MutableIpv4Packet::minimum_packet_size() + icmp_payload.len();
     let ip_buf = vec![0u8; packet_size];
-    let mut ip_p = MutableIpv4Packet::owned(ip_buf).unwrap();
+    let mut ip_p = MutableIpv4Packet::owned(ip_buf)
+        .ok_or_else(|| IterationError::Recoverable("Failed to allocate reply".to_owned()))?;
     ip_p.set_version(4);
     ip_p.set_header_length(5);
     ip_p.set_dscp(24);
     ip_p.set_ecn(0);
-    ip_p.set_total_length(packet_size.try_into().unwrap());
+    ip_p.set_total_length(
+        packet_size
+            .try_into()
+            .map_err(|_| IterationError::Recoverable("Packet Size too large".to_owned()))?,
+    );
     ip_p.set_identification(0);
     ip_p.set_flags(0);
     ip_p.set_fragment_offset(0);
@@ -241,7 +239,8 @@ fn send_iteration(ping: PingTransaction) -> Result<Vec<u8>, IterationError> {
 
     let ip_payload = ip_p.packet();
     let eth_buf = vec![0u8; MutableEthernetPacket::minimum_packet_size() + ip_payload.len()];
-    let mut eth_p = MutableEthernetPacket::owned(eth_buf).unwrap();
+    let mut eth_p = MutableEthernetPacket::owned(eth_buf)
+        .ok_or_else(|| IterationError::Recoverable("Failed to allocate reply".to_owned()))?;
     eth_p.set_source(MacAddr::from(ping.src_mac));
     eth_p.set_destination(MacAddr::from(ping.dst_mac));
     eth_p.set_ethertype(EtherTypes::Ipv4);

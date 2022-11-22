@@ -15,18 +15,16 @@ pub fn agent_list() -> Html {
 
     let fragments: Html = sessions.iter().sorted_by_key(|(id,_)|**id)
         .map(|(id, data)| {
-            let id = id.clone();
+            let id = *id;
             let last_checkin = data
                 .last_checkin
-                .clone()
                 .map(|then|{
                     let mut result = Date::now() - then;
                     result /= 1000.0;
                     result = result.floor();
                     if result < 0.0 {0.0} else {result}
                 })
-                .and_then(|t| Some(format!("{} sec ago", t)))
-                .unwrap_or("Never".to_owned());
+                .map_or_else(||"Never".to_owned(),|t| format!("{t} sec ago"));
 
             let delete_cb = Callback::from(move |_|{
                 spawn_local(async move {
@@ -41,7 +39,7 @@ pub fn agent_list() -> Html {
             html!(<key={id}>
                     <div>{id}</div>
                     <div>{data.arch.clone()}</div>
-                    <div>{data.host.clone().map(|v|v.to_string()).unwrap_or("Unknown".to_owned())}</div>
+                    <div>{data.host.map_or_else(||"Unknown".to_owned(), |v|v.to_string())}</div>
                     <div>{last_checkin}</div>
                     <div><span class="clickable" onclick={delete_cb}>{"🗑️"}</span><span class="clickable" onclick={edit_cb}>{"🛠️"}</span></div>
                   </>)
@@ -60,9 +58,9 @@ pub fn agent_list() -> Html {
                 }
             });
         });
-        return move || {
+        move || {
             drop(interval);
-        };
+        }
     });
 
     let editor = if edit_visible.is_some() {

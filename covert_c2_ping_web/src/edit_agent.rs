@@ -8,12 +8,12 @@ use yew::{
 };
 
 #[derive(Properties, PartialEq)]
-pub struct EditAgentProps {
+pub struct Props {
     pub id: UseStateHandle<Option<u16>>,
 }
 
 #[function_component(EditAgent)]
-pub fn edit_agent(props: &EditAgentProps) -> Html {
+pub fn edit_agent(props: &Props) -> Html {
     let id = props.id.unwrap();
     let edit = props.id.clone();
     let close = {
@@ -39,8 +39,7 @@ pub fn edit_agent(props: &EditAgentProps) -> Html {
     };
 
     let on_submit = {
-        let edit = edit.clone();
-        let sleep = *sleep.clone();
+        let sleep = *sleep;
         Callback::from(move |_| {
             edit.set(None);
             spawn_local(async move {
@@ -51,7 +50,8 @@ pub fn edit_agent(props: &EditAgentProps) -> Html {
                     })
                     .unwrap()
                     .send()
-                    .await.unwrap();
+                    .await
+                    .unwrap();
             });
         })
     };

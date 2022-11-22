@@ -9,7 +9,7 @@ use tokio::io::AsyncReadExt;
 
 use crate::environment;
 
-pub async fn get_patched_bin<'a>(conf: ClientConfig<'a>, arch: String) -> Result<Vec<u8>> {
+pub async fn get_patched_bin(conf: ClientConfig<'_>, arch: String) -> Result<Vec<u8>> {
     let artifact_path = environment::get_artifact_path();
     let mut artifact = match arch.as_str() {
         "x64" => File::open(artifact_path.join("artifact_64")).await?,
@@ -23,7 +23,7 @@ pub async fn get_patched_bin<'a>(conf: ClientConfig<'a>, arch: String) -> Result
         .enumerate()
         .find(|(_, win)| win.iter().all(|i| *i == STAMP_BYTE))
         .map(|(i, _)| i)
-        .ok_or(anyhow!("Could not find stamp location"))?;
+        .ok_or_else(|| anyhow!("Could not find stamp location"))?;
     let key: [u8; KEY_SIZE] = rand::random();
     artifact_buf[stamp_loc..stamp_loc + KEY_SIZE].copy_from_slice(&key);
     let stamp_buf = &mut artifact_buf[stamp_loc + KEY_SIZE..stamp_loc + BUF_SIZE];
