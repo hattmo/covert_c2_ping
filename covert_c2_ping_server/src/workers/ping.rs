@@ -167,7 +167,10 @@ fn ping_send(
     mut downstream_reciever: mpsc::UnboundedReceiver<Transaction>,
     iface: NetworkInterface,
 ) -> Result<()> {
-    match linux::channel(&iface, LinuxConfig::default()) {
+    println!("{}", iface);
+    let mut conf = LinuxConfig::default();
+    conf.promiscuous = false;
+    match linux::channel(&iface, conf) {
         Ok(EthernetChan(mut sender, _)) => loop {
             tracing::info!("Waiting to send ping");
             let ping = match downstream_reciever.blocking_recv() {
