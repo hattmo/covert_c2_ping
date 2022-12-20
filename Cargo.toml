@@ -1,2 +1,9 @@
 [workspace]
 members = ["covert_c2_ping_server","covert_c2_ping_client","covert_c2_ping_common","covert_c2_ping_web"]
+
+[profile.release]
+strip = true
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"

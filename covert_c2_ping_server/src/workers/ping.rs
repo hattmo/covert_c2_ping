@@ -53,7 +53,7 @@ pub fn start_workers() -> Result<WorkerHandles> {
     let interface = interfaces
         .iter()
         .find(|i| i.name == GLOBAL_CONF.i)
-        .expect("Interface not found")
+        .ok_or(anyhow!("Couldn't find interface"))?
         .clone();
     let mac = interface
         .mac
@@ -196,6 +196,7 @@ fn ping_send(
             bail!("This device is not an ethernet device");
         }
         Err(err) => {
+            tracing::info!("Failed to open raw socket");
             bail!(err);
         }
     }

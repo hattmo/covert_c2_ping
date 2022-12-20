@@ -2,7 +2,7 @@ cargo-features = ["per-package-target"]
 
 [package]
 authors = ["Matthew \"Oscar\" Howard"]
-default-target = "x86_64-unknown-linux-gnu"
+default-target = "x86_64-unknown-linux-musl"
 description = "Server for recieving ping covert channels for cobalt strike"
 edition = "2021"
 name = "covert_c2_ping_server"
