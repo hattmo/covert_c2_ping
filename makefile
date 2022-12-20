@@ -15,7 +15,7 @@ all: $(64client) $(32client) $(server) $(web)/index.html
 	cp $(server) out/covert_c2_ping
 	cp $(web)/* out/static
 	mdbook build
-	rm covert_c2_ping.tar.gz
+	rm -f covert_c2_ping.tar.gz
 	tar -cvzf covert_c2_ping.tar.gz out/*
 
 deploy: all
@@ -27,7 +27,7 @@ clean:
 	cargo clean
 	rm -rf out
 	rm -rf covert_c2_ping_web/dist
-	rm covert_c2_ping.tar.gz
+	rm -f covert_c2_ping.tar.gz
 
 $(32client): covert_c2_ping_client/src/*
 	RUSTFLAGS='-C link-arg=-s' cargo build -Z build-std=std,panic_abort -Z build-std-features=panic_immediate_abort --target i686-pc-windows-gnu --release -p covert_c2_ping_client
