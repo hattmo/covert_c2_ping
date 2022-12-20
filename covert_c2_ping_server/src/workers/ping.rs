@@ -167,7 +167,6 @@ fn ping_send(
     mut downstream_reciever: mpsc::UnboundedReceiver<Transaction>,
     iface: NetworkInterface,
 ) -> Result<()> {
-    println!("{}", iface);
     let mut conf = LinuxConfig::default();
     conf.promiscuous = false;
     match linux::channel(&iface, conf) {
