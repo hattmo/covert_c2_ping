@@ -4,7 +4,7 @@ use wasm_bindgen::JsCast;
 use wasm_bindgen_futures::spawn_local;
 use web_sys::{HtmlInputElement, MouseEvent};
 use yew::{
-    function_component, html, html::onchange, use_state, Callback, Properties, UseStateHandle,
+    function_component, html, html::onchange, use_state, Callback, Html, Properties, UseStateHandle,
 };
 
 #[derive(Properties, PartialEq)]

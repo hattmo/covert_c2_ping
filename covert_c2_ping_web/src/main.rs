@@ -4,7 +4,7 @@ mod edit_agent;
 mod new_agent;
 use agent_list::AgentList;
 use new_agent::NewAgentForm;
-use yew::{function_component, html};
+use yew::{function_component, html, Html};
 
 #[function_component(Root)]
 fn root() -> Html {
@@ -18,5 +18,5 @@ fn root() -> Html {
 
 fn main() {
     wasm_logger::init(wasm_logger::Config::default());
-    yew::start_app::<Root>();
+    yew::Renderer::<Root>::new().render();
 }
