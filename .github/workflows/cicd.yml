@@ -1,7 +1,5 @@
-name: Publish Pages
-
 concurrency:
-  group: pages
+  group: cicd
   cancel-in-progress: true
 
 on:
@@ -14,12 +12,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - uses: actions-rs/toolchain@v1
+      - uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: nightly
+          components: rust-src
+          target: x86_64-unknown-linux-musl, i686-pc-windows-gnu, x86_64-pc-windows-gnu, wasm32-unknown-unknown
       - run: cargo install mdbook
-      - run: mkdir -p out/doc
-      - run: mdbook build
+      - run: cargo install trunk
+      - run: sudo apt install -y mingw-w64 build-essential
+      - run: make
+      - uses: actions/upload-artifact@v3
+        with:
+          name: release.tar.gz
+          path: covert_c2_ping.tar.gz
       - uses: actions/upload-pages-artifact@v1
         with:
           path: out/doc

@@ -27,6 +27,13 @@ rustup target add x86_64-pc-windows-gnu
 rustup target add wasm32-unknown-unknown
 ```
 
+- rust binaries
+
+```
+cargo install mdbook
+cargo install trunk
+```
+
 - cross compiler
 ```
 sudo apt install mingw-w64
