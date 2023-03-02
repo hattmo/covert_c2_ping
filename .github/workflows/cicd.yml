@@ -19,7 +19,7 @@ jobs:
           target: x86_64-unknown-linux-musl, i686-pc-windows-gnu, x86_64-pc-windows-gnu, wasm32-unknown-unknown
       - run: cargo install mdbook
       - run: cargo install trunk
-      - run: sudo apt install -y mingw-w64 build-essential
+      - run: sudo apt update -y && sudo apt install -y mingw-w64 build-essential
       - run: make
       - uses: actions/upload-artifact@v3
         with:
