@@ -167,16 +167,15 @@ fn ping_send(
     mut downstream_reciever: mpsc::UnboundedReceiver<Transaction>,
     iface: NetworkInterface,
 ) -> Result<()> {
-    let mut conf = LinuxConfig::default();
-    conf.promiscuous = false;
+    let conf = LinuxConfig {
+        promiscuous: false,
+        ..Default::default()
+    };
     match linux::channel(&iface, conf) {
         Ok(EthernetChan(mut sender, _)) => loop {
             tracing::info!("Waiting to send ping");
-            let ping = match downstream_reciever.blocking_recv() {
-                Some(ping) => ping,
-                None => {
-                    bail!("Downstream channel closed stopping send task");
-                }
+            let Some(ping) = downstream_reciever.blocking_recv() else {
+                bail!("Downstream channel closed stopping send task");
             };
             tracing::info!("Got ping message to send");
             match send_iteration(&ping) {

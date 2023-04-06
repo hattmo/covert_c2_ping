@@ -116,9 +116,7 @@ async fn main_loop(
 ) -> Result<()> {
     loop {
         tracing::info!("Waiting for message");
-        let incoming_ping = if let Some(ping) = upstream_receiver.recv().await {
-            ping
-        } else {
+        let Some(incoming_ping) = upstream_receiver.recv().await else {
             tracing::info!("Upstream worker closed");
             break;
         };
@@ -126,8 +124,7 @@ async fn main_loop(
         let out_data: Vec<u8> = match channel_state {
             Ok((inc_chan, has_message)) => {
                 let mut session_guard = SESSIONS.lock().await;
-                let session = session_guard.get_mut(&inc_chan);
-                if let Some((notify, session_data)) = session {
+                if let Some((notify, session_data)) = session_guard.get_mut(&inc_chan) {
                     session_data.last_checkin = SystemTime::now()
                         .duration_since(UNIX_EPOCH)
                         .ok()
