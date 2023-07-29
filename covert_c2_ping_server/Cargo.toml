@@ -8,6 +8,9 @@ edition = "2021"
 name = "covert_c2_ping_server"
 version = "0.1.1"
 
+[build-dependencies.bindgen]
+version = "0.66.*"
+
 [dependencies]
 covert_c2_ping_common = {path = "../covert_c2_ping_common"}
 anyhow = "1"

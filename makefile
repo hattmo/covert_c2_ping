@@ -31,13 +31,13 @@ clean:
 
 # -Z build-std=std,panic_abort -Z build-std-features=panic_immediate_abort
 $(32client): covert_c2_ping_client/src/*
-	RUSTFLAGS='-C link-arg=-s' cross build --target i686-pc-windows-gnu --release -p covert_c2_ping_client
+	RUSTFLAGS='-C link-arg=-s' cargo build --target i686-pc-windows-gnu --release -p covert_c2_ping_client
 
 $(64client): covert_c2_ping_client/src/*
-	RUSTFLAGS='-C link-arg=-s' cross build --target x86_64-pc-windows-gnu --release -p covert_c2_ping_client
+	RUSTFLAGS='-C link-arg=-s' cargo build --target x86_64-pc-windows-gnu --release -p covert_c2_ping_client
 
 $(server): covert_c2_ping_server/src/* covert_c2_ping_server/src/workers/*
-	cross build --target x86_64-unknown-linux-musl --release -p covert_c2_ping_server
+	cross build --target x86_64-unknown-linux-gnu --release -p covert_c2_ping_server
 
 $(web)/index.html: covert_c2_ping_web/src/*
 	trunk build covert_c2_ping_web/index.html

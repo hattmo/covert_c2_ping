@@ -1,21 +1,9 @@
 use anyhow::Result;
 use std::{io::ErrorKind, process::Command, thread::sleep, time::Duration};
+
+mod bindings;
 pub struct Rules {}
-impl Drop for Rules {
-    #[tracing::instrument(name = "teardown_rules", skip_all)]
-    fn drop(&mut self) {
-        tracing::info!("Clearing rules");
-        if Command::new("nft")
-            .arg("delete table ip covert_table")
-            .status()
-            .is_err()
-        {
-            tracing::info!("Failed to clear rules");
-        } else {
-            tracing::info!("Rules cleared");
-        };
-    }
-}
+
 impl Rules {
     #[tracing::instrument(name = "setup_rules")]
     pub fn new() -> Result<Self> {
@@ -50,5 +38,21 @@ impl Rules {
         sleep(Duration::from_secs(1));
         tracing::info!("Rules setup");
         Ok(Rules {})
+    }
+}
+
+impl Drop for Rules {
+    #[tracing::instrument(name = "teardown_rules", skip_all)]
+    fn drop(&mut self) {
+        tracing::info!("Clearing rules");
+        if Command::new("nft")
+            .arg("delete table ip covert_table")
+            .status()
+            .is_err()
+        {
+            tracing::info!("Failed to clear rules");
+        } else {
+            tracing::info!("Rules cleared");
+        };
     }
 }
